@@ -1,0 +1,222 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Pillar 1: Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global hardened primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidTimestamp(ts) {
+      return ts is timestamp && ts <= request.time;
+    }
+
+    // Validation Helper: Course
+    function isValidCourse(data, userId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             data.userId == request.auth.uid &&
+             data.courseName is string &&
+             data.courseName.size() >= 1 &&
+             data.courseName.size() <= 80 &&
+             data.dayOfWeek is int &&
+             data.dayOfWeek >= 1 &&
+             data.dayOfWeek <= 7 &&
+             data.startMinuteOfDay is int &&
+             data.startMinuteOfDay >= 0 &&
+             data.startMinuteOfDay <= 1439 &&
+             data.endMinuteOfDay is int &&
+             data.endMinuteOfDay >= 1 &&
+             data.endMinuteOfDay <= 1440 &&
+             data.endMinuteOfDay > data.startMinuteOfDay &&
+             data.location is string &&
+             data.location.size() <= 100 &&
+             data.teacher is string &&
+             data.teacher.size() <= 60 &&
+             data.weeksText is string &&
+             data.weeksText.size() <= 60 &&
+             data.colorIndex is int &&
+             data.colorIndex >= 0 &&
+             data.colorIndex <= 7 &&
+             data.reminderEnabled is bool &&
+             data.reminderMinutesBefore is int &&
+             data.reminderMinutesBefore >= 0 &&
+             data.reminderMinutesBefore <= 180 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    // Validation Helper: Exam
+    function isValidExam(data, userId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             data.userId == request.auth.uid &&
+             data.title is string &&
+             data.title.size() >= 1 &&
+             data.title.size() <= 100 &&
+             data.courseName is string &&
+             data.courseName.size() <= 80 &&
+             data.examEpochMillis is int &&
+             data.examEpochMillis > 0 &&
+             data.durationMinutes is int &&
+             data.durationMinutes >= 15 &&
+             data.durationMinutes <= 600 &&
+             data.location is string &&
+             data.location.size() <= 100 &&
+             data.seatNumber is string &&
+             data.seatNumber.size() <= 40 &&
+             data.notes is string &&
+             data.notes.size() <= 300 &&
+             data.reminderEnabled is bool &&
+             data.reminderOffsetsMinutes is list &&
+             data.reminderOffsetsMinutes.size() <= 10 &&
+             (data.reminderOffsetsMinutes.size() == 0 || data.reminderOffsetsMinutes[0] is int) &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    // Validation Helper: UserPreferences
+    function isValidPreferences(data, userId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             data.userId == request.auth.uid &&
+             data.defaultClassReminderMinutes is int &&
+             data.defaultClassReminderMinutes >= 0 &&
+             data.defaultClassReminderMinutes <= 180 &&
+             data.defaultExamReminderOffsets is list &&
+             data.defaultExamReminderOffsets.size() <= 10 &&
+             (data.defaultExamReminderOffsets.size() == 0 || data.defaultExamReminderOffsets[0] is int) &&
+             data.classRemindersEnabled is bool &&
+             data.examRemindersEnabled is bool &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    // User-scoped Courses Subcollection
+    match /users/{userId}/courses/{courseId} {
+      allow list: if isOwner(userId);
+      allow get: if isOwner(userId) && isValidId(courseId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(courseId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'courseName', 'dayOfWeek', 'startMinuteOfDay', 'endMinuteOfDay',
+                         'location', 'teacher', 'weeksText', 'colorIndex',
+                         'reminderEnabled', 'reminderMinutesBefore', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'courseName', 'dayOfWeek', 'startMinuteOfDay', 'endMinuteOfDay',
+                         'location', 'teacher', 'weeksText', 'colorIndex',
+                         'reminderEnabled', 'reminderMinutesBefore', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidCourse(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(courseId) &&
+                       isValidCourse(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       (
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'courseName', 'dayOfWeek', 'startMinuteOfDay', 'endMinuteOfDay',
+                           'location', 'teacher', 'weeksText', 'colorIndex',
+                           'reminderEnabled', 'reminderMinutesBefore', 'updatedAt'
+                         ]) ||
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'reminderEnabled', 'updatedAt'
+                         ])
+                       );
+
+      allow delete: if isOwner(userId) && isValidId(courseId);
+    }
+
+    // User-scoped Exams Subcollection
+    match /users/{userId}/exams/{examId} {
+      allow list: if isOwner(userId);
+      allow get: if isOwner(userId) && isValidId(examId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(examId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'title', 'courseName', 'examEpochMillis', 'durationMinutes',
+                         'location', 'seatNumber', 'notes', 'reminderEnabled',
+                         'reminderOffsetsMinutes', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'title', 'courseName', 'examEpochMillis', 'durationMinutes',
+                         'location', 'seatNumber', 'notes', 'reminderEnabled',
+                         'reminderOffsetsMinutes', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidExam(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(examId) &&
+                       isValidExam(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       (
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'title', 'courseName', 'examEpochMillis', 'durationMinutes',
+                           'location', 'seatNumber', 'notes', 'reminderEnabled',
+                           'reminderOffsetsMinutes', 'updatedAt'
+                         ]) ||
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'reminderEnabled', 'updatedAt'
+                         ])
+                       );
+
+      allow delete: if isOwner(userId) && isValidId(examId);
+    }
+
+    // User-scoped Reminder Preferences Subcollection
+    match /users/{userId}/preferences/{prefId} {
+      allow list: if isOwner(userId);
+      allow get: if isOwner(userId) && isValidId(prefId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(prefId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'defaultClassReminderMinutes', 'defaultExamReminderOffsets',
+                         'classRemindersEnabled', 'examRemindersEnabled', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'defaultClassReminderMinutes', 'defaultExamReminderOffsets',
+                         'classRemindersEnabled', 'examRemindersEnabled', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidPreferences(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(prefId) &&
+                       isValidPreferences(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'defaultClassReminderMinutes', 'defaultExamReminderOffsets',
+                         'classRemindersEnabled', 'examRemindersEnabled', 'updatedAt'
+                       ]);
+
+      allow delete: if isOwner(userId) && isValidId(prefId);
+    }
+  }
+}

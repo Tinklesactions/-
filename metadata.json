@@ -1,0 +1,6 @@
+{
+  "name": "课表提醒",
+  "description": "支持导入课程表图片自动识别课表、按日期时间上课提醒，以及考试日程管理和考前自动通知提醒的校园学习助手。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

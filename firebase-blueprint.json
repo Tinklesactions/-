@@ -1,0 +1,211 @@
+{
+  "entities": {
+    "Course": {
+      "title": "Course",
+      "description": "A recurring weekly class session imported from a timetable image or added manually.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated owner UID matching request.auth.uid."
+        },
+        "courseName": {
+          "type": "string",
+          "description": "Course title (1-80 chars)."
+        },
+        "dayOfWeek": {
+          "type": "integer",
+          "description": "ISO day of week from 1 (Monday) to 7 (Sunday)."
+        },
+        "startMinuteOfDay": {
+          "type": "integer",
+          "description": "Class start time as minutes since midnight (0-1439)."
+        },
+        "endMinuteOfDay": {
+          "type": "integer",
+          "description": "Class end time as minutes since midnight (1-1440), strictly greater than startMinuteOfDay."
+        },
+        "location": {
+          "type": "string",
+          "description": "Classroom or building location (0-100 chars)."
+        },
+        "teacher": {
+          "type": "string",
+          "description": "Instructor name (0-60 chars)."
+        },
+        "weeksText": {
+          "type": "string",
+          "description": "Academic weeks label such as 1-16周 (0-60 chars)."
+        },
+        "colorIndex": {
+          "type": "integer",
+          "description": "Visual accent palette index (0-7)."
+        },
+        "reminderEnabled": {
+          "type": "boolean",
+          "description": "Whether local pre-class reminder notifications are active."
+        },
+        "reminderMinutesBefore": {
+          "type": "integer",
+          "description": "Lead time in minutes before class starts (0-180)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp written via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp written via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": [
+        "userId",
+        "courseName",
+        "dayOfWeek",
+        "startMinuteOfDay",
+        "endMinuteOfDay",
+        "location",
+        "teacher",
+        "weeksText",
+        "colorIndex",
+        "reminderEnabled",
+        "reminderMinutesBefore",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Exam": {
+      "title": "Exam",
+      "description": "A scheduled exam with date, time, location, and multi-stage automatic pre-exam reminders.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated owner UID matching request.auth.uid."
+        },
+        "title": {
+          "type": "string",
+          "description": "Exam title (1-100 chars)."
+        },
+        "courseName": {
+          "type": "string",
+          "description": "Related course name (0-80 chars)."
+        },
+        "examEpochMillis": {
+          "type": "integer",
+          "description": "Exam start instant in Unix epoch milliseconds."
+        },
+        "durationMinutes": {
+          "type": "integer",
+          "description": "Exam duration in minutes (15-600)."
+        },
+        "location": {
+          "type": "string",
+          "description": "Exam hall or classroom (0-100 chars)."
+        },
+        "seatNumber": {
+          "type": "string",
+          "description": "Seat number or exam desk label (0-40 chars)."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional exam notes such as open-book materials (0-300 chars)."
+        },
+        "reminderEnabled": {
+          "type": "boolean",
+          "description": "Whether automatic pre-exam notifications are enabled."
+        },
+        "reminderOffsetsMinutes": {
+          "type": "array",
+          "description": "List of pre-exam notification lead times in minutes (up to 10 entries, e.g., 4320, 1440, 120, 30)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp written via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp written via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": [
+        "userId",
+        "title",
+        "courseName",
+        "examEpochMillis",
+        "durationMinutes",
+        "location",
+        "seatNumber",
+        "notes",
+        "reminderEnabled",
+        "reminderOffsetsMinutes",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "UserPreferences": {
+      "title": "UserPreferences",
+      "description": "User-level default reminder lead times and toggles.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated owner UID matching request.auth.uid."
+        },
+        "defaultClassReminderMinutes": {
+          "type": "integer",
+          "description": "Default lead minutes before class (0-180)."
+        },
+        "defaultExamReminderOffsets": {
+          "type": "array",
+          "description": "Default pre-exam reminder lead times in minutes (up to 10 integers)."
+        },
+        "classRemindersEnabled": {
+          "type": "boolean",
+          "description": "Global toggle for class reminders."
+        },
+        "examRemindersEnabled": {
+          "type": "boolean",
+          "description": "Global toggle for exam reminders."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp written via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp written via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": [
+        "userId",
+        "defaultClassReminderMinutes",
+        "defaultExamReminderOffsets",
+        "classRemindersEnabled",
+        "examRemindersEnabled",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/courses/{courseId}": {
+      "schema": { "$ref": "#/entities/Course" },
+      "description": "Per-user weekly class timetable entries."
+    },
+    "/users/{userId}/exams/{examId}": {
+      "schema": { "$ref": "#/entities/Exam" },
+      "description": "Per-user scheduled exams and pre-exam automatic reminder configurations."
+    },
+    "/users/{userId}/preferences/{prefId}": {
+      "schema": { "$ref": "#/entities/UserPreferences" },
+      "description": "Per-user reminder preferences document (settings)."
+    }
+  }
+}
